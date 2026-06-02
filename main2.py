@@ -9,30 +9,53 @@ if not book_url:
     exit()
 
 print(f"\nTARGET URL: {book_url}")
-
+city = 'ahmedabad'
+movie = 'chand mera dil'
 start_time = datetime.now()
 with sync_playwright() as p:
-
     browser = p.chromium.launch(
-        channel="chrome",
-        headless=False,  
-        args=["--disable-blink-features=AutomationControlled"],
+            channel="chrome",
+            headless=False,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                # "--blink-settings=imagesEnabled=false",
+            ],
+        )
+
+    context = browser.new_context(
+        permissions=["geolocation"],
+        geolocation={"latitude": 37.7749, "longitude": -122.4194}
     )
 
-    context = browser.new_context(viewport={"width": 1280, "height": 800})
     page = context.new_page()
-    
-    print("Navigating to BookMyShow...")
-    page.goto(book_url)
-    
-    print("Selecting movie...")
-    page.locator("a[href*='chand-mera-dil']").first.click()
+    page.goto(f'https://in.bookmyshow.com/explore/home/{city}')
+
+    page.locator("//div[contains(@class,'kudrkl')]").click()
+
+    search = page.get_by_placeholder("Search for movies, events, plays, sports...")
+
+    search.fill(movie)
+    page.wait_for_timeout(2000)
+    page.locator("//div[@id='generic']//div[contains(@class,'sc-1h5m8q1-0')]").first.click()
+
     
     print("Clicking 'Book tickets'...")
     page.get_by_role("button", name="Book tickets").click()
     
-    print("Selecting showtime (10:10 PM)...")
-    page.locator("div").filter(has_text="10:10 PM").last.click()
+    print("Selecting showtime (11:00 PM)...")
+    page.locator("div").filter(has_text="11:00 PM").last.click()
+
+    seat_count = 2
+
+    page.locator("input[type='range']").evaluate(
+        f"""
+        (el) => {{
+            el.value = {seat_count};
+            el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+        }}
+        """
+    )
     
     # Wait for seat selector acceptance modal if any
     page.locator("//button[@aria-label='Select Seats']").click()
@@ -44,7 +67,7 @@ with sync_playwright() as p:
     canvas.wait_for(state="visible")
 
     # Target the layout IDs specified in your script
-    target_seats = ["Seat-B-K--01", "Seat-B-K--02"]
+    target_seats = ["Seat-B-L--16"]
     seat_coords = []
 
     for seat_id in target_seats:
@@ -79,7 +102,6 @@ with sync_playwright() as p:
         else:
             print(f"Could not find coordinates for {seat_id} via Konva API.")
 
-    # Click the seats using Playwright mouse controls
     if len(seat_coords) > 0:
         box = canvas.bounding_box()
         if box:
@@ -92,7 +114,7 @@ with sync_playwright() as p:
                 page.mouse.move(click_x, click_y)
                 page.mouse.click(click_x, click_y)
                 print(f"Clicked on coordinates: X={click_x}, Y={click_y}")
-                time.sleep(0.6) # Small buffer to let state update
+                input('wait...') # Small buffer to let state update
                 
             # --- Click the checkout/pay amount button ---
             print("Looking for payment button...")
@@ -112,7 +134,5 @@ with sync_playwright() as p:
     else:
         print("No valid seats coordinates caught. Skipping clicks...")
         
-    time.sleep(5) # Keep open momentarily to view selection
-    browser.close()
-
-    # sc-zgl7vj-8 fUiPnc
+    time.sleep(5)
+    input('wait..')
